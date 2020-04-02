@@ -4,8 +4,10 @@
 
 #define N 7
 #define SIZE 4
-#define player_colour 0xF800 // red
-#define obstacle_colour 0x001F // blue
+#define PLAYER_COLOUR 0xF800 // red
+#define OBSTACLE_COLOUR 0x001F // blue
+
+#define PLATFORM_SIZE 20
 
 void clear_screen();
 void draw_line(int x0, int y0, int x1, int y1, short int color);
@@ -36,7 +38,7 @@ int main(){
             y[i] = 235;
             incy[i] = -1;
         }
-        x[i] = 20 + 55*i;
+        x[i] = PLATFORM_SIZE + 55*i;
     }
 
     // Set position for player
@@ -92,8 +94,8 @@ void wait() {
 void clear_screen() {
     for (int x = 0; x < 320; x++){
         for (int y = 0; y < 240; y++){
-            if ((x >= 0 && x < 20) || (x >= 300 && x < 320)){
-                if (y >= 110 && y < 130){
+            if ((x >= 0 && x < PLATFORM_SIZE) || (x >= 320 - PLATFORM_SIZE && x < 320)){
+                if (y >= (240/2)-PLATFORM_SIZE/2 && y < (240/2)+PLATFORM_SIZE/2){
                     plot_pixel(x, y, 0x07E0); 
                 }
                 else{
@@ -142,7 +144,7 @@ void plot_obstacles(){
     for (int i = 0; i < N-1; ++i){
         for (int j = 0; j < SIZE; ++j){
             for (int k = 0; k < SIZE; ++k){
-                plot_pixel(x[i] + j, y[i] + k, obstacle_colour);
+                plot_pixel(x[i] + j, y[i] + k, OBSTACLE_COLOUR);
             }
         }
         if (y[i] == 1) incy[i] = 1;
@@ -155,16 +157,36 @@ void plot_obstacles(){
 void plot_player(){
     for (int i = 0; i < SIZE; ++i){
         for (int j = 0; j < SIZE; ++j){
-            plot_pixel(x[N-1] + i, y[N-1] + j, player_colour);
+            plot_pixel(x[N-1] + i, y[N-1] + j, PLAYER_COLOUR);
         }
     }
 }
 
-/* GAME LOGIC */
+/* GAME LOGIC FUNCTIONS */
 
 bool check_in_bounds(){
     if (x[N-1] < 0 || x[N-1] >= 320 || y[N-1] < 0 || y[N-1] >= 240){
         return false;
     }
     return true;
+}
+
+bool player_hit(){
+    for (int i = 0; i < N-1; ++i){
+        for (int j = 0; j < SIZE; ++j){
+            if ((x[N-1] + SIZE-1) == x[i] + j){
+                return true;
+            }
+            else if ((x[N-1]) == x[i] + j){
+                return true;
+            }
+            else if ((y[N-1] + SIZE-1) == y[i] + j){
+                return true;
+            }
+            else if ((y[N-1]) == y[i] + j){
+                return true;
+            }
+        }
+    }
+    return false;
 }
