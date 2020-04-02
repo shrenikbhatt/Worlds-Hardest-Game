@@ -63,12 +63,17 @@ int main(){
 
     
     while (true){
+        // Clear obstacles
         for (int i = 0; i < N-1; ++i){
-            if (y[i] >= SIZE && y[i] <= 235){
+            if (y[i] >= 1 && y[i] <= 235){
                 if (incy[i] == 1){
                     for (int j = 0; j < SIZE; ++j){
                         for (int k = 0; k < SIZE; ++k){
-                            plot_pixel(x[i] + j, y[i] + k - SIZE , 0x0);
+                            if (y[i] + k - SIZE < 0){
+                                plot_pixel(x[i] + j, 0 , 0x0);
+                            }
+                            else
+                                plot_pixel(x[i] + j, y[i] + k - SIZE , 0x0);
                         }
                     }
                 }
@@ -80,11 +85,10 @@ int main(){
                     }
                 }
                 
-            }
-            else{
-                clear_screen();
-            }
-
+            }            
+        }
+        
+        for (int i = 0; i < N-1; ++i){
             for (int j = 0; j < SIZE; ++j){
                 for (int k = 0; k < SIZE; ++k){
                     plot_pixel(x[i] + j, y[i] + k, obstacle_colour);
@@ -94,9 +98,7 @@ int main(){
             else if (y[i] == 235) incy[i] = -1;
 
             y[i] += incy[i];
-            
         }
-        
         wait(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
         
