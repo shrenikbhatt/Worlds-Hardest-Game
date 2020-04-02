@@ -39,7 +39,7 @@ int main(){
             y[i] = 235;
             incy[i] = -1;
         }
-        x[i] = 18 + 56*i;
+        x[i] = 20 + 55*i;
     }
 
     // Set position for player
@@ -70,24 +70,24 @@ int main(){
                     for (int j = 0; j < SIZE; ++j){
                         for (int k = 0; k < SIZE; ++k){
                             if (y[i] + k - SIZE < 0){
-                                plot_pixel(x[i] + j, 0 , 0x0);
+                                plot_pixel(x[i] + j, 0 , 0xFFFF);
                             }
                             else
-                                plot_pixel(x[i] + j, y[i] + k - SIZE , 0x0);
+                                plot_pixel(x[i] + j, y[i] + k - SIZE , 0xFFFF);
                         }
                     }
                 }
                 else{
                     for (int j = 0; j < SIZE; ++j){
                         for (int k = 0; k < SIZE; ++k){
-                            plot_pixel(x[i] + j, y[i] + k + SIZE , 0x0);
+                            plot_pixel(x[i] + j, y[i] + k + SIZE , 0xFFFF);
                         }
                     }
                 }
                 
             }            
         }
-        
+        // Plot obstacles
         for (int i = 0; i < N-1; ++i){
             for (int j = 0; j < SIZE; ++j){
                 for (int k = 0; k < SIZE; ++k){
@@ -122,47 +122,23 @@ void wait() {
 }
 
 void clear_screen() {
-    for (int x = 0; x < 320; x++)
-        for (int y = 0; y < 240; y++)
-            plot_pixel(x, y, 0x0);   
+    for (int x = 0; x < 320; x++){
+        for (int y = 0; y < 240; y++){
+            if ((x >= 0 && x < 20) || (x >= 300 && x < 320)){
+                if (y >= 110 && y < 130){
+                    plot_pixel(x, y, 0x07E0); 
+                }
+                else{
+                    plot_pixel(x, y, 0xFFFF);   
+                }
+            }
+            else{
+                plot_pixel(x, y, 0xFFFF);   
+            }
+        }
+    }
 }
 
 void plot_pixel(int x, int y, short int line_color){
     *(short int *)(pixel_buffer_start + (y << 10) + (x << 1)) = line_color;
-}
-
-void draw_line (int x0, int y0, int x1, int y1, short int color) {
-    bool is_steep = abs(y1 - y0) > abs (x1 -x0);
-    if (is_steep) {
-        swap(&x0, &y0);
-        swap(&x1, &y1);
-    }
-    if (x0 > x1) {
-        swap(&x0, &x1);
-        swap(&y0, &y1);
-    }
-
-    int deltax = x1 - x0;
-    int deltay = abs(y1 - y0);
-    int error = -(deltax / 2);
-    int y = y0;
-    int y_step;
-    if (y0 < y1) {
-        y_step = 1;
-    } else {
-        y_step = -1;
-    }
-
-    for (int x = x0; x <= x1; x++) {
-        if (is_steep) {
-            plot_pixel(y, x, color);
-        } else {
-            plot_pixel(x, y, color);
-        }
-        error += deltay;
-        if (error >= 0) {
-            y += y_step;
-            error -= deltax;
-        }
-    }
 }
