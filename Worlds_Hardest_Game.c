@@ -11,6 +11,11 @@ void clear_screen();
 void draw_line(int x0, int y0, int x1, int y1, short int color);
 void plot_pixel(int x, int y, short int line_color);
 void wait();
+void plot_obstacles();
+void plot_player();
+void clear_obstacles();
+bool check_in_bounds();
+
 
 volatile int pixel_buffer_start; // global variable
 volatile int pixel_backBuffer_start;
@@ -153,4 +158,13 @@ void plot_player(){
             plot_pixel(x[N-1] + i, y[N-1] + j, player_colour);
         }
     }
+}
+
+/* GAME LOGIC */
+
+bool check_in_bounds(){
+    if (x[N-1] < 0 || x[N-1] >= 320 || y[N-1] < 0 || y[N-1] >= 240){
+        return false;
+    }
+    return true;
 }
