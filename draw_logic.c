@@ -4,6 +4,8 @@
 
 #define N 7
 #define SIZE 4
+#define player_colour 0xF800 // red
+#define obstacle_colour 0x001F // blue
 
 void clear_screen();
 void draw_line(int x0, int y0, int x1, int y1, short int color);
@@ -13,21 +15,11 @@ void wait();
 volatile int pixel_buffer_start; // global variable
 volatile int pixel_backBuffer_start;
 
-void swap(int * x, int * y){
-	int temp = *x;
-    *x = *y;
-    *y = temp;   
-}
+// define the number of obstacles + player
+int x[N], y[N], incx[N], incy[N];
 
 int main(){
     volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
-
-    // define the number of obstacles + player
-    int x[N], y[N], incx[N], incy[N];
-
-
-    int player_colour = 0xF800; // player will be red
-    int obstacle_colour = 0x001F; // obstacles will be blue
 
     // Set the initial positions of the obstacles
     for (int i = 0; i < N-1; ++i){
@@ -43,8 +35,8 @@ int main(){
     }
 
     // Set position for player
-    x[N-1] = 0; 
-    y[N-1] = 120;
+    x[N-1] = 8; 
+    y[N-1] = 118;
 
 
      *(pixel_ctrl_ptr + 1) = 0xC8000000; // first store the address in the back buffer
@@ -58,47 +50,18 @@ int main(){
     /* set back pixel buffer to start of SDRAM memory */
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
-
     clear_screen();
 
     
     while (true){
         // Clear obstacles
-        for (int i = 0; i < N-1; ++i){
-            if (y[i] >= 1 && y[i] <= 235){
-                if (incy[i] == 1){
-                    for (int j = 0; j < SIZE; ++j){
-                        for (int k = 0; k < SIZE; ++k){
-                            if (y[i] + k - SIZE < 0){
-                                plot_pixel(x[i] + j, 0 , 0xFFFF);
-                            }
-                            else
-                                plot_pixel(x[i] + j, y[i] + k - SIZE , 0xFFFF);
-                        }
-                    }
-                }
-                else{
-                    for (int j = 0; j < SIZE; ++j){
-                        for (int k = 0; k < SIZE; ++k){
-                            plot_pixel(x[i] + j, y[i] + k + SIZE , 0xFFFF);
-                        }
-                    }
-                }
-                
-            }            
-        }
+        clear_obstacles();
         // Plot obstacles
-        for (int i = 0; i < N-1; ++i){
-            for (int j = 0; j < SIZE; ++j){
-                for (int k = 0; k < SIZE; ++k){
-                    plot_pixel(x[i] + j, y[i] + k, obstacle_colour);
-                }
-            }
-            if (y[i] == 1) incy[i] = 1;
-            else if (y[i] == 235) incy[i] = -1;
+        plot_obstacles();
 
-            y[i] += incy[i];
-        }
+        // plot player
+        plot_player();
+
         wait(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
         
@@ -141,4 +104,53 @@ void clear_screen() {
 
 void plot_pixel(int x, int y, short int line_color){
     *(short int *)(pixel_buffer_start + (y << 10) + (x << 1)) = line_color;
+}
+
+
+void clear_obstacles(){
+    for (int i = 0; i < N-1; ++i){
+        if (y[i] >= 1 && y[i] <= 235){
+            if (incy[i] == 1){
+                for (int j = 0; j < SIZE; ++j){
+                    for (int k = 0; k < SIZE; ++k){
+                        if (y[i] + k - SIZE < 0){
+                            plot_pixel(x[i] + j, 0 , 0xFFFF);
+                        }
+                        else
+                            plot_pixel(x[i] + j, y[i] + k - SIZE , 0xFFFF);
+                    }
+                }
+            }
+            else{
+                for (int j = 0; j < SIZE; ++j){
+                    for (int k = 0; k < SIZE; ++k){
+                        plot_pixel(x[i] + j, y[i] + k + SIZE , 0xFFFF);
+                    }
+                }
+            }
+            
+        }            
+    }
+}
+
+void plot_obstacles(){
+    for (int i = 0; i < N-1; ++i){
+        for (int j = 0; j < SIZE; ++j){
+            for (int k = 0; k < SIZE; ++k){
+                plot_pixel(x[i] + j, y[i] + k, obstacle_colour);
+            }
+        }
+        if (y[i] == 1) incy[i] = 1;
+        else if (y[i] == 235) incy[i] = -1;
+
+        y[i] += incy[i];
+    }
+}
+
+void plot_player(){
+    for (int i = 0; i < SIZE; ++i){
+        for (int j = 0; j < SIZE; ++j){
+            plot_pixel(x[N-1] + i, y[N-1] + j, player_colour);
+        }
+    }
 }
