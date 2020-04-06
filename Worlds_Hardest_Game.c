@@ -2,10 +2,12 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define N 7
+#define M 7
+#define NUM_COINS 5
 #define SIZE 4
 #define PLAYER_COLOUR 0xF800 // red
 #define OBSTACLE_COLOUR 0x001F // blue
+#define COINS_COLOR 0xFF00
 
 #define PLATFORM_SIZE 20
 
@@ -14,22 +16,48 @@ void draw_line(int x0, int y0, int x1, int y1, short int color);
 void plot_pixel(int x, int y, short int line_color);
 void wait();
 void plot_obstacles();
+void plot_coins();
 void plot_player();
 void clear_obstacles();
 bool check_in_bounds();
+bool player_hit();
+void init_player();
+void clear_player();
+int collected_coin();
+void clear_coin(int coin);
+
+void disable_A9_interrupts(void);
+void set_A9_IRQ_stack(void);
+void config_GIC(void);
+void config_KEYs(void);
+void enable_A9_interrupts(void);
 
 
 volatile int pixel_buffer_start; // global variable
 volatile int pixel_backBuffer_start;
 
 // define the number of obstacles + player
-int x[N], y[N], incx[N], incy[N];
+int x[M], y[M], incx[M], incy[M];
+int coinX[NUM_COINS], coinY[NUM_COINS];
+bool coin_exists[NUM_COINS];
+
+int old_pos[2];
 
 int main(){
     volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
 
+    disable_A9_interrupts();// disable interrupts in the A9 processor
+    set_A9_IRQ_stack();// initialize the stack pointer for IRQ mode
+    config_GIC();// configure the general interrupt controller
+    config_KEYs();// configure pushbutton KEYs to generate interrupts 
+    
+    enable_A9_interrupts();// enable interrupts in the A9 processor
+
+    bool gameOn = true; 
+    bool hitCheck; 
+   
     // Set the initial positions of the obstacles
-    for (int i = 0; i < N-1; ++i){
+    for (int i = 0; i < M-1; ++i){
         if (i%2 == 0){
             y[i] = 1;
             incy[i] = 1;
@@ -42,8 +70,16 @@ int main(){
     }
 
     // Set position for player
-    x[N-1] = 8; 
-    y[N-1] = 118;
+    init_player();
+    old_pos[0] = 8; 
+    old_pos[1] = 118;
+
+    // Set position for coins
+    for (int i = 0; i < NUM_COINS; i++){
+        coin_exists[i] = true;
+        coinX[i] = 10;
+        coinY[i] = (int) (rand() % 100 + 10);
+    }
 
 
      *(pixel_ctrl_ptr + 1) = 0xC8000000; // first store the address in the back buffer
@@ -52,22 +88,47 @@ int main(){
     /* initialize a pointer to the pixel buffer, used by drawing functions */
     pixel_buffer_start = *pixel_ctrl_ptr;
     clear_screen();
-
+    
 
     /* set back pixel buffer to start of SDRAM memory */
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
     clear_screen();
 
-    
-    while (true){
+    // Code to write SW to HEX display
+    int count = 0;
+    volatile int* HEX3_0_ptr = 0xFF200020;
+    char seg7[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66}; // 0, 1,2,3,4
+
+
+
+
+    while (gameOn){
+        // plot coins
+        plot_coins();
+
         // Clear obstacles
         clear_obstacles();
         // Plot obstacles
         plot_obstacles();
 
+        // clear player
+        clear_player();
+
         // plot player
         plot_player();
+        
+        if (player_hit()){
+            count++;
+            init_player();
+        }
+        // check if player collides into a coin
+        int coin = collected_coin();
+        if(coin != -1){
+            count++;
+        }
+        
+        *HEX3_0_ptr = seg7[count];
 
         wait(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
@@ -115,7 +176,7 @@ void plot_pixel(int x, int y, short int line_color){
 
 
 void clear_obstacles(){
-    for (int i = 0; i < N-1; ++i){
+    for (int i = 0; i < M-1; ++i){
         if (y[i] >= 1 && y[i] <= 235){
             if (incy[i] == 1){
                 for (int j = 0; j < SIZE; ++j){
@@ -140,8 +201,26 @@ void clear_obstacles(){
     }
 }
 
+void clear_player(){
+    for (int i = 0; i < SIZE; ++i){
+        for (int j = 0; j < SIZE; ++j){
+            if ((old_pos[0] + i >= 0 && old_pos[0] + i < PLATFORM_SIZE) || (old_pos[0] + i >= 320 - PLATFORM_SIZE && old_pos[0] + i < 320)){
+                if (old_pos[1] + j >= (240/2)-PLATFORM_SIZE/2 && old_pos[1] + j < (240/2)+PLATFORM_SIZE/2){
+                    plot_pixel(old_pos[0]+i, old_pos[1]+j, 0x07E0); 
+                }
+                else{
+                    plot_pixel(old_pos[0]+i, old_pos[1]+j, 0xFFFF);   
+                }
+            }
+            else{
+                plot_pixel(old_pos[0]+i, old_pos[1]+j, 0xFFFF);   
+            }
+        }
+    }
+}
+
 void plot_obstacles(){
-    for (int i = 0; i < N-1; ++i){
+    for (int i = 0; i < M-1; ++i){
         for (int j = 0; j < SIZE; ++j){
             for (int k = 0; k < SIZE; ++k){
                 plot_pixel(x[i] + j, y[i] + k, OBSTACLE_COLOUR);
@@ -157,36 +236,201 @@ void plot_obstacles(){
 void plot_player(){
     for (int i = 0; i < SIZE; ++i){
         for (int j = 0; j < SIZE; ++j){
-            plot_pixel(x[N-1] + i, y[N-1] + j, PLAYER_COLOUR);
+            plot_pixel(x[M-1] + i, y[M-1] + j, PLAYER_COLOUR);
         }
     }
 }
 
+void plot_coins(){
+    for (int a = 0; a < NUM_COINS; ++a){
+        for (int i = 0; i < SIZE; ++i){
+            for (int j = 0; j < SIZE; ++j){
+                if (coin_exists[a]){
+                    plot_pixel(coinX[a]+i, coinY[a]+j, COINS_COLOR);
+                }
+                else {
+                    plot_pixel(coinX[a]+i, coinY[a]+j, 0xFFFF);
+                }
+            }
+        }
+    }
+
+}
+
+void init_player(){
+    x[M-1] = 8; 
+    y[M-1] = 118;
+}
+
+
 /* GAME LOGIC FUNCTIONS */
 
 bool check_in_bounds(){
-    if (x[N-1] < 0 || x[N-1] >= 320 || y[N-1] < 0 || y[N-1] >= 240){
+    if (x[M-1] < 0 || x[M-1] >= 320 || y[M-1] < 0 || y[M-1] >= 240){
         return false;
     }
     return true;
 }
 
 bool player_hit(){
-    for (int i = 0; i < N-1; ++i){
+    for (int i = 0; i < M-1; ++i){
         for (int j = 0; j < SIZE; ++j){
-            if ((x[N-1] + SIZE-1) == x[i] + j){
-                return true;
-            }
-            else if ((x[N-1]) == x[i] + j){
-                return true;
-            }
-            else if ((y[N-1] + SIZE-1) == y[i] + j){
-                return true;
-            }
-            else if ((y[N-1]) == y[i] + j){
-                return true;
-            }
+			for (int k = 0; k < SIZE; ++k){
+				if ((x[M-1] + k) == (x[i] + j) && (y[M-1] + k) == (y[i]+j)){
+                    old_pos[0] = x[M-1]; 
+                    old_pos[1] = y[M-1];
+					return true;
+                }
+			}
         }
     }
     return false;
 }
+
+void clear_coin(int coin){
+    for (int j = 0; j < SIZE; ++j){
+        for (int k = 0; k < SIZE; ++k){
+            plot_pixel(coinX[coin]+j, coinY[coin]+k,0xFFFF);
+        }
+    }
+}
+
+int collected_coin(){
+    for (int i = 0; i < NUM_COINS; ++i){
+        for (int j = 0; j < SIZE; ++j){
+			for (int k = 0; k < SIZE; ++k){
+				if (((x[M-1] + k) == (coinX[i] + j)) && ((y[M-1] + k) == (coinY[i]+j)) && coin_exists[i]){
+                    coin_exists[i] = false;
+					return i;
+                }
+			}
+        }
+    }
+    return -1;
+}
+
+/*setup the KEY interrupts in the FPGA*/
+void config_KEYs() {
+    volatile int *KEY_ptr = (int*) 0xFF200050;// pushbutton KEY base address
+    *(KEY_ptr + 2) = 0xF;// enable interrupts for the two KEYs
+}
+    
+/*This file:
+*1. defines exception vectors for the A9 processor
+*2. provides code that sets the IRQ mode stack, and that dis/enables*interrupts
+*3. provides code that initializes the generic interrupt controller*/
+
+void pushbutton_ISR(void);
+void config_interrupt(int,int);
+
+// Define the IRQ exception handler
+
+void __attribute__((interrupt)) __cs3_isr_irq(void) {
+
+    // Read the ICCIAR from the CPU Interface in the GIC
+    int interrupt_ID =*((int*)0xFFFEC10C);
+    if(interrupt_ID == 73)  // check if interrupt is from the KEYs
+        pushbutton_ISR();
+    else
+        while(1); // if unexpected, then stay here
+        
+    // Write to the End of Interrupt Register (ICCEOIR)
+    *((int*)0xFFFEC110) = interrupt_ID;
+}
+
+/**Turn off interrupts in the ARM processor*/
+
+void disable_A9_interrupts(void) {
+    int status = 0b11010011;
+    asm("msr cpsr, %[ps]" : : [ps] "r"(status));
+}
+
+/**Initialize the banked stack pointer register for IRQ mode*/
+
+void set_A9_IRQ_stack(void) {
+    
+    int stack, mode;
+    stack = 0xFFFFFFFF - 7;// top of A9 onchip memory, aligned to 8 bytes/*change processor to IRQ mode with interrupts disabled*/
+    mode = 0b11010010;
+    asm("msr cpsr, %[ps]" : : [ps] "r"(mode));
+    /*set banked stack pointer*/
+    asm("mov sp, %[ps]" : : [ps] "r"(stack));
+    
+    /*go back to SVC mode before executing subroutine return!*/
+    mode = 0b11010011;
+    asm("msr cpsr, %[ps]" : : [ps] "r"(mode));
+}
+
+/**Turn on interrupts in the ARM processor*/
+void enable_A9_interrupts(void) {
+    int status = 0b01010011;
+    asm("msr cpsr, %[ps]" : : [ps] "r"(status));
+}
+
+/**Configure the Generic Interrupt Controller (GIC)*/
+void config_GIC(void) {
+    config_interrupt (73, 1);
+    // configure the FPGA KEYs interrupt (73)
+    
+    // Set Interrupt Priority Mask Register (ICCPMR). Enable interrupts of all priorities
+    *((int*) 0xFFFEC104) = 0xFFFF;
+    
+    // Set CPU Interface Control Register (ICCICR). Enable signaling of interrupts
+    *((int*) 0xFFFEC100) = 1;
+    
+    // Configure the Distributor Control Register (ICDDCR) to send pending interrupts to CPUs
+    *((int*) 0xFFFED000) = 1;
+}
+
+/**Configure Set Enable Registers (ICDISERn) and Interrupt Processor Target*Registers (ICDIPTRn). The default (reset) values are used for other registers*in the GIC.*/
+void config_interrupt(int N,int CPU_target) {
+    int reg_offset, index, value, address;
+    /*Configure the Interrupt Set-Enable Registers (ICDISERn).*reg_offset = (integer_div(N / 32)*4*value = 1 << (N mod 32)*/
+    reg_offset = (N >> 3) & 0xFFFFFFFC;
+    index      = N & 0x1F;
+    value      = 0x1 << index;
+    address    = 0xFFFED100 + reg_offset;
+    /*Now that we know the register address and value, set the appropriate bit*/
+    *(int*)address |= value;
+    
+    /*Configure the Interrupt Processor Targets Register (ICDIPTRn)*reg_offset = integer_div(N / 4)*4*index = N mod 4*/
+    reg_offset = (N & 0xFFFFFFFC);
+    index      = N & 0x3;
+    address    = 0xFFFED800 + reg_offset + index;
+    /*Now that we know the register address and value, write to (only) the*appropriate byte*/
+    *(char*)address = (char)CPU_target;
+}
+
+/*********************************************************************
+Pushbutton - Interrupt Service Routine
+*
+*This routine checks which KEY has been pressed.
+*******************************************************************/
+void pushbutton_ISR(void) {
+    /*KEY base address*/
+    volatile int*KEY_ptr = (int*) 0xFF200050;
+    int press;
+    press          =*(KEY_ptr + 3);// read the pushbutton interrupt register
+    *(KEY_ptr + 3) = press;// Clear the interrupt
+
+    old_pos[0] = x[M-1];
+    old_pos[1] = y[M-1];
+
+    if(press & 0x1){ // KEY0
+        y[M-1] = y[M-1] + SIZE+1; 
+    }
+    else if(press & 0x2){// KEY1
+        x[M-1] = x[M-1] + SIZE+1;
+    }
+    else if(press & 0x4){ // KEY2
+        x[M-1] = x[M-1] - (SIZE+1);
+    }
+    else    // press & 0x8, which is KEY3
+        y[M-1] = y[M-1] - (SIZE+1);
+
+    return;
+}
+
+
+
+
