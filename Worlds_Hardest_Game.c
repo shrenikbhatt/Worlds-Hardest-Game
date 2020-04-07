@@ -24,7 +24,6 @@ bool player_hit();
 void init_player();
 void clear_player();
 int collected_coin();
-void clear_coin(int coin);
 
 void disable_A9_interrupts(void);
 void set_A9_IRQ_stack(void);
@@ -32,13 +31,12 @@ void config_GIC(void);
 void config_KEYs(void);
 void enable_A9_interrupts(void);
 
-
 volatile int pixel_buffer_start; // global variable
 volatile int pixel_backBuffer_start;
 
 // define the number of obstacles + player
 int x[M], y[M], incx[M], incy[M];
-int coinX[NUM_COINS], coinY[NUM_COINS];
+int coin_x[NUM_COINS], coin_y[NUM_COINS];
 bool coin_exists[NUM_COINS];
 
 int old_pos[2];
@@ -53,9 +51,7 @@ int main(){
     
     enable_A9_interrupts();// enable interrupts in the A9 processor
 
-    bool gameOn = true; 
-    bool hitCheck; 
-   
+    bool gameOn = true;    
     // Set the initial positions of the obstacles
     for (int i = 0; i < M-1; ++i){
         if (i%2 == 0){
@@ -77,8 +73,8 @@ int main(){
     // Set position for coins
     for (int i = 0; i < NUM_COINS; i++){
         coin_exists[i] = true;
-        coinX[i] = 10;
-        coinY[i] = (int) (rand() % 100 + 10);
+        coin_x[i] = 25+ i * 67;
+        coin_y[i] = 10 + i*55;
     }
 
 
@@ -97,26 +93,24 @@ int main(){
 
     // Code to write SW to HEX display
     int count = 0;
-    volatile int* HEX3_0_ptr = 0xFF200020;
-    char seg7[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66}; // 0, 1,2,3,4
+    volatile int* HEX3_0_ptr = (int *) 0xFF200020;
+    char seg7[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x67}; // 0 - 9
 
 
 
 
     while (gameOn){
-        // plot coins
+        // coins
         plot_coins();
 
-        // Clear obstacles
-        clear_obstacles();
-        // Plot obstacles
-        plot_obstacles();
-
-        // clear player
+        // player
         clear_player();
-
-        // plot player
         plot_player();
+
+
+        // obstacles
+        clear_obstacles();
+        plot_obstacles();
         
         if (player_hit()){
             count++;
@@ -127,8 +121,14 @@ int main(){
         if(coin != -1){
             count++;
         }
-        
-        *HEX3_0_ptr = seg7[count];
+
+        // Death Count (up until 99)
+        if (count >= 10){
+            *HEX3_0_ptr = (seg7[(int) (count / 10)] << 8) | seg7[count % 10] ;
+        }
+        else{
+            *HEX3_0_ptr = seg7[count];
+        }
 
         wait(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
@@ -245,11 +245,13 @@ void plot_coins(){
     for (int a = 0; a < NUM_COINS; ++a){
         for (int i = 0; i < SIZE; ++i){
             for (int j = 0; j < SIZE; ++j){
+                int x = coin_x[a];
+                int y = coin_y[a]; 
                 if (coin_exists[a]){
-                    plot_pixel(coinX[a]+i, coinY[a]+j, COINS_COLOR);
+                    plot_pixel(x+i, y+j, COINS_COLOR);
                 }
                 else {
-                    plot_pixel(coinX[a]+i, coinY[a]+j, 0xFFFF);
+                    plot_pixel(x+i, y+j, 0xFFFF);
                 }
             }
         }
@@ -266,7 +268,7 @@ void init_player(){
 /* GAME LOGIC FUNCTIONS */
 
 bool check_in_bounds(){
-    if (x[M-1] < 0 || x[M-1] >= 320 || y[M-1] < 0 || y[M-1] >= 240){
+    if (x[M-1] < 0 || x[M-1] >= 320 - SIZE || y[M-1] < 0 || y[M-1] >= 240-SIZE){
         return false;
     }
     return true;
@@ -274,36 +276,27 @@ bool check_in_bounds(){
 
 bool player_hit(){
     for (int i = 0; i < M-1; ++i){
-        for (int j = 0; j < SIZE; ++j){
-			for (int k = 0; k < SIZE; ++k){
-				if ((x[M-1] + k) == (x[i] + j) && (y[M-1] + k) == (y[i]+j)){
-                    old_pos[0] = x[M-1]; 
-                    old_pos[1] = y[M-1];
-					return true;
-                }
-			}
+        if ((x[M-1] + SIZE  >= x[i]) && (x[M-1] <= x[i]+ SIZE)){
+            if ((y[M-1] + SIZE  >= y[i]) && (y[M-1] <= y[i] + SIZE)){
+                old_pos[0] = x[M-1]; 
+                old_pos[1] = y[M-1];
+    			return true;  
+            }
         }
     }
     return false;
 }
 
-void clear_coin(int coin){
-    for (int j = 0; j < SIZE; ++j){
-        for (int k = 0; k < SIZE; ++k){
-            plot_pixel(coinX[coin]+j, coinY[coin]+k,0xFFFF);
-        }
-    }
-}
 
 int collected_coin(){
     for (int i = 0; i < NUM_COINS; ++i){
-        for (int j = 0; j < SIZE; ++j){
-			for (int k = 0; k < SIZE; ++k){
-				if (((x[M-1] + k) == (coinX[i] + j)) && ((y[M-1] + k) == (coinY[i]+j)) && coin_exists[i]){
+        if ((x[M-1] + SIZE  >= coin_x[i]) && (x[M-1] <= coin_x[i]+ SIZE)){
+            if ((y[M-1] + SIZE  >= coin_y[i]) && (y[M-1] <= coin_y[i] + SIZE)){
+                if (coin_exists[i]){
                     coin_exists[i] = false;
-					return i;
-                }
-			}
+                    return i;
+                }     
+            }
         }
     }
     return -1;
@@ -418,15 +411,30 @@ void pushbutton_ISR(void) {
 
     if(press & 0x1){ // KEY0
         y[M-1] = y[M-1] + SIZE+1; 
+        if(!check_in_bounds()){
+            y[M-1] = y[M-1] - SIZE+1; 
+        }
+
     }
     else if(press & 0x2){// KEY1
         x[M-1] = x[M-1] + SIZE+1;
+        if(!check_in_bounds()){
+            x[M-1] = x[M-1] - SIZE+1;
+        }
     }
     else if(press & 0x4){ // KEY2
         x[M-1] = x[M-1] - (SIZE+1);
+        if(!check_in_bounds()){
+            x[M-1] = x[M-1] + (SIZE+1);
+        }
     }
-    else    // press & 0x8, which is KEY3
+    else{   // press & 0x8, which is KEY3
         y[M-1] = y[M-1] - (SIZE+1);
+        if(!check_in_bounds()){
+            y[M-1] = y[M-1] + (SIZE+1);
+        }
+    }
+        
 
     return;
 }
