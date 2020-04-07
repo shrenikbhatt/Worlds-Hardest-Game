@@ -119,6 +119,10 @@ int main(){
         if (player_hit()){
             count++;
             init_player();
+            coin_count = 0;
+            for (int i = 0; i < NUM_COINS; i++){
+                coin_exists[i] = true;
+            }
         }
         // check if player collides into a coin
         int coin = collected_coin();
@@ -126,12 +130,17 @@ int main(){
             coin_count++;
         }
 
+        // Reset death count after 100 deaths.
+        if (count == 100){
+            count = 0;
+        }
+
         // Death Count (up until 99)
         if (count >= 10){
             *HEX3_0_ptr = (seg7[(int) (count / 10)] << 8) | seg7[count % 10] ;
         }
         else{
-            *HEX3_0_ptr = seg7[count];
+            *HEX3_0_ptr = (seg7[0] << 8) | seg7[count];
         }
 
         wait(); // swap front and back buffers on VGA vertical sync
