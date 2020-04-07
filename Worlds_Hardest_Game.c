@@ -24,6 +24,7 @@ bool player_hit();
 void init_player();
 void clear_player();
 int collected_coin();
+bool check_win(int coin_count);
 
 void disable_A9_interrupts(void);
 void set_A9_IRQ_stack(void);
@@ -73,8 +74,11 @@ int main(){
     // Set position for coins
     for (int i = 0; i < NUM_COINS; i++){
         coin_exists[i] = true;
-        coin_x[i] = 25+ i * 67;
-        coin_y[i] = 10 + i*55;
+        // coin_x[i] = 25+ i * 67;
+        // coin_y[i] = 10 + i*55;
+        coin_x[i] = rand() % 300 + 20;
+        coin_y[i] = rand() % 210 + 5;
+
     }
 
 
@@ -96,10 +100,10 @@ int main(){
     volatile int* HEX3_0_ptr = (int *) 0xFF200020;
     char seg7[] = {0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x67}; // 0 - 9
 
+    int coin_count = 0;
 
 
-
-    while (gameOn){
+    while (!check_win(coin_count)){
         // coins
         plot_coins();
 
@@ -119,7 +123,7 @@ int main(){
         // check if player collides into a coin
         int coin = collected_coin();
         if(coin != -1){
-            count++;
+            coin_count++;
         }
 
         // Death Count (up until 99)
@@ -300,6 +304,17 @@ int collected_coin(){
         }
     }
     return -1;
+}
+
+bool check_win(int coin_count){
+    if (coin_count == NUM_COINS){
+        if ((x[M-1] >= 0 && x[M-1] < PLATFORM_SIZE) || (x[M-1] >= 320 - PLATFORM_SIZE && x[M-1] < 320)){
+            if (y[M-1] >= (240/2)-PLATFORM_SIZE/2 && y[M-1] < (240/2)+PLATFORM_SIZE/2){
+                return true; 
+            }
+        }
+    }
+    return false;
 }
 
 /*setup the KEY interrupts in the FPGA*/
