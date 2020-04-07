@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define M 7
-#define NUM_COINS 5
-#define SIZE 4
+#define M 10
+#define NUM_COINS 10
+#define SIZE 6
 #define PLAYER_COLOUR 0xF800 // red
 #define OBSTACLE_COLOUR 0x001F // blue
 #define COINS_COLOR 0xFF00
@@ -63,7 +63,7 @@ int main(){
             y[i] = 235;
             incy[i] = -1;
         }
-        x[i] = PLATFORM_SIZE + 55*i;
+        x[i] = PLATFORM_SIZE + ((320-PLATFORM_SIZE)/(M-1))*i;
     }
 
     // Set position for player
