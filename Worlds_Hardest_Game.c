@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 #define M 10
-#define NUM_COINS 10
+#define NUM_COINS 3
 #define SIZE 6
 #define PLAYER_COLOUR 0xF800 // red
 #define OBSTACLE_COLOUR 0x001F // blue
@@ -15,7 +15,7 @@ void clear_screen();
 void draw_line(int x0, int y0, int x1, int y1, short int color);
 void plot_pixel(int x, int y, short int line_color);
 void wait();
-void plot_obstacles();
+void plot_obstacles(int level);
 void plot_coins();
 void plot_player();
 void clear_obstacles();
@@ -25,6 +25,13 @@ void init_player();
 void clear_player();
 int collected_coin();
 bool check_win(int coin_count);
+void write_string(int a, int b, char c);
+void write_opening_display();
+void write_next_level_display();
+void write_clear_display();
+void write_finished_display();
+void colour_screen(short int colour);
+
 
 void disable_A9_interrupts(void);
 void set_A9_IRQ_stack(void);
@@ -44,6 +51,7 @@ int old_pos[2];
 
 int main(){
     volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
+    volatile int * sw_ptr = (int *) 0xFF200040;
 
     disable_A9_interrupts();// disable interrupts in the A9 processor
     set_A9_IRQ_stack();// initialize the stack pointer for IRQ mode
@@ -52,7 +60,9 @@ int main(){
     
     enable_A9_interrupts();// enable interrupts in the A9 processor
 
-    bool gameOn = true;    
+
+    // Level 1
+
     // Set the initial positions of the obstacles
     for (int i = 0; i < M-1; ++i){
         if (i%2 == 0){
@@ -63,6 +73,7 @@ int main(){
             y[i] = 235;
             incy[i] = -1;
         }
+        incx[i] = 0;
         x[i] = PLATFORM_SIZE + ((320-PLATFORM_SIZE)/(M-1))*i;
     }
 
@@ -87,6 +98,16 @@ int main(){
     wait();
     /* initialize a pointer to the pixel buffer, used by drawing functions */
     pixel_buffer_start = *pixel_ctrl_ptr;
+
+    // Introduction
+    colour_screen(0x0000);
+    int prev = *sw_ptr;
+     while (*sw_ptr == prev){
+         write_opening_display();
+     }
+
+     write_clear_display();
+
     clear_screen();
     
 
@@ -103,6 +124,217 @@ int main(){
     int coin_count = 0;
 
 
+  /*  while (!check_win(coin_count)){
+        // coins
+        plot_coins();
+
+        // player
+        clear_player();
+        plot_player();
+
+
+        // obstacles
+        clear_obstacles();
+        plot_obstacles(1);
+        
+        if (player_hit()){
+            count++;
+            init_player();
+            coin_count = 0;
+            for (int i = 0; i < NUM_COINS; i++){
+                coin_exists[i] = true;
+            }
+        }
+        // check if player collides into a coin
+        int coin = collected_coin();
+        if(coin != -1){
+            coin_count++;
+        }
+
+        // Reset death count after 100 deaths.
+        if (count == 100){
+            count = 0;
+        }
+
+        // Death Count (up until 99)
+        if (count >= 10){
+            *HEX3_0_ptr = (seg7[(int) (count / 10)] << 8) | seg7[count % 10] ;
+        }
+        else{
+            *HEX3_0_ptr = (seg7[0] << 8) | seg7[count];
+        }
+
+        wait(); // swap front and back buffers on VGA vertical sync
+        pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
+        
+    } */
+
+    // Level 2
+    // Set the initial positions of the obstacles
+    for (int i = 0; i < M-1; ++i){
+        if (i%2 == 0){
+            y[i] = 1;
+            incy[i] = 2;
+        }
+        else {
+            y[i] = 235;
+            incy[i] = -2;
+        }
+        incx[i] = 0;
+        x[i] = PLATFORM_SIZE + ((320-PLATFORM_SIZE)/(M-1))*i;
+    }
+
+    // Set position for player
+    init_player();
+    old_pos[0] = 8; 
+    old_pos[1] = 118;
+
+    // Set position for coins
+    for (int i = 0; i < NUM_COINS; i++){
+        coin_exists[i] = true;
+        // coin_x[i] = 25+ i * 67;
+        // coin_y[i] = 10 + i*55;
+        coin_x[i] = rand() % 300 + 20;
+        coin_y[i] = rand() % 210 + 5;
+
+    }
+
+
+     *(pixel_ctrl_ptr + 1) = 0xC8000000; // first store the address in the back buffer
+    /* now, swap the front/back buffers, to set the front buffer location */
+    wait();
+    /* initialize a pointer to the pixel buffer, used by drawing functions */
+    pixel_buffer_start = *pixel_ctrl_ptr;
+
+    
+    colour_screen(0x0000);
+    
+
+    prev = *sw_ptr;
+
+     while (*sw_ptr == prev){
+         write_next_level_display();
+     }
+
+    write_clear_display();
+    clear_screen();
+    
+
+    /* set back pixel buffer to start of SDRAM memory */
+    *(pixel_ctrl_ptr + 1) = 0xC0000000;
+    pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
+    clear_screen();
+
+    count = 0;
+
+    coin_count = 0;
+
+
+  /*  while (!check_win(coin_count)){
+        // coins
+        plot_coins();
+
+        // player
+        clear_player();
+        plot_player();
+
+
+        // obstacles
+        clear_obstacles();
+        plot_obstacles(2);
+        
+        if (player_hit()){
+            count++;
+            init_player();
+            coin_count = 0;
+            for (int i = 0; i < NUM_COINS; i++){
+                coin_exists[i] = true;
+            }
+        }
+        // check if player collides into a coin
+        int coin = collected_coin();
+        if(coin != -1){
+            coin_count++;
+        }
+
+        // Reset death count after 100 deaths.
+        if (count == 100){
+            count = 0;
+        }
+
+        // Death Count (up until 99)
+        if (count >= 10){
+            *HEX3_0_ptr = (seg7[(int) (count / 10)] << 8) | seg7[count % 10] ;
+        }
+        else{
+            *HEX3_0_ptr = (seg7[0] << 8) | seg7[count];
+        }
+
+        wait(); // swap front and back buffers on VGA vertical sync
+        pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
+        
+    } */
+
+
+    // Level 3
+     for (int i = 0; i < M-1; ++i){
+        if (i%2 == 0){
+            y[i] = 1;
+            incy[i] = 3;
+        }
+        else {
+            y[i] = 235;
+            incy[i] = -3;
+        }
+        incx[i] = 0;
+        x[i] = PLATFORM_SIZE + ((320-PLATFORM_SIZE)/(M-1))*i;
+    }
+
+    // Set position for player
+    init_player();
+    old_pos[0] = 8; 
+    old_pos[1] = 118;
+
+    // Set position for coins
+    for (int i = 0; i < NUM_COINS; i++){
+        coin_exists[i] = true;
+        // coin_x[i] = 25+ i * 67;
+        // coin_y[i] = 10 + i*55;
+        coin_x[i] = rand() % 300 + 20;
+        coin_y[i] = rand() % 210 + 5;
+
+    }
+
+
+     *(pixel_ctrl_ptr + 1) = 0xC8000000; // first store the address in the back buffer
+    /* now, swap the front/back buffers, to set the front buffer location */
+    wait();
+    /* initialize a pointer to the pixel buffer, used by drawing functions */
+    pixel_buffer_start = *pixel_ctrl_ptr;
+
+    colour_screen(0x0000);
+    
+
+    prev = *sw_ptr;
+
+     while (*sw_ptr == prev){
+         write_next_level_display();
+     }
+
+    write_clear_display();
+    clear_screen();
+    
+
+    /* set back pixel buffer to start of SDRAM memory */
+    *(pixel_ctrl_ptr + 1) = 0xC0000000;
+    pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
+    clear_screen();
+
+    count = 0;
+
+    coin_count = 0;
+
+
     while (!check_win(coin_count)){
         // coins
         plot_coins();
@@ -114,7 +346,7 @@ int main(){
 
         // obstacles
         clear_obstacles();
-        plot_obstacles();
+        plot_obstacles(3);
         
         if (player_hit()){
             count++;
@@ -147,6 +379,20 @@ int main(){
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
         
     }
+
+    *(pixel_ctrl_ptr + 1) = 0xC8000000; // first store the address in the back buffer
+    /* now, swap the front/back buffers, to set the front buffer location */
+    wait();
+    /* initialize a pointer to the pixel buffer, used by drawing functions */
+    pixel_buffer_start = *pixel_ctrl_ptr;
+
+    colour_screen(0x0000);
+
+    bool finished = true;
+
+     while (finished){
+         write_finished_display();
+     }
 
     return 0;
 }
@@ -183,6 +429,14 @@ void clear_screen() {
     }
 }
 
+void colour_screen(short int colour) {
+    for (int i = 0; i < 320; i++){
+        for (int j = 0; j < 240; j++){
+                plot_pixel(i, j, 0x0000);
+        }
+    }
+}
+
 void plot_pixel(int x, int y, short int line_color){
     *(short int *)(pixel_buffer_start + (y << 10) + (x << 1)) = line_color;
 }
@@ -190,8 +444,8 @@ void plot_pixel(int x, int y, short int line_color){
 
 void clear_obstacles(){
     for (int i = 0; i < M-1; ++i){
-        if (y[i] >= 1 && y[i] <= 235){
-            if (incy[i] == 1){
+        if (y[i] >= 1 && y[i] <= 235 && incy[i] != 0){
+            if (incy[i] >= 1){
                 for (int j = 0; j < SIZE; ++j){
                     for (int k = 0; k < SIZE; ++k){
                         if (y[i] + k - SIZE < 0){
@@ -210,7 +464,28 @@ void clear_obstacles(){
                 }
             }
             
-        }            
+        }   
+        else if (x[i] >= PLATFORM_SIZE && x[i] <= 318-PLATFORM_SIZE && incx[i] != 0){
+            if (incx[i] == 2){
+                for (int j = 0; j < SIZE; ++j){
+                    for (int k = 0; k < SIZE; ++k){
+                        if (x[i] + k - SIZE < PLATFORM_SIZE){
+                            plot_pixel(x[i] + j, 0 , 0xFFFF);
+                        }
+                        else
+                            plot_pixel(x[i] + j, y[i] + k - SIZE , 0xFFFF);
+                    }
+                }
+            }
+            else{
+                for (int j = 0; j < SIZE; ++j){
+                    for (int k = 0; k < SIZE; ++k){
+                        plot_pixel(x[i] + j, y[i] + k + SIZE , 0xFFFF);
+                    }
+                }
+            }
+            
+        }        
     }
 }
 
@@ -232,17 +507,25 @@ void clear_player(){
     }
 }
 
-void plot_obstacles(){
+void plot_obstacles(int level){
     for (int i = 0; i < M-1; ++i){
         for (int j = 0; j < SIZE; ++j){
             for (int k = 0; k < SIZE; ++k){
                 plot_pixel(x[i] + j, y[i] + k, OBSTACLE_COLOUR);
             }
         }
-        if (y[i] == 1) incy[i] = 1;
-        else if (y[i] == 235) incy[i] = -1;
-
-        y[i] += incy[i];
+        if (incx[i] == 0){
+            if (y[i] <= 1) incy[i] = level;
+            else if (y[i] >= 235) incy[i] = -1*level;
+            y[i] += incy[i];
+        }
+        // else if (incy[i] == 0){
+        //     if (x[i] <= PLATFORM_SIZE+2) incx[i] = 2;
+        //     else if (x[i] >= 318-PLATFORM_SIZE) incx[i] = -2;
+        //     x[i] += incx[i];
+        // }
+        
+        
     }
 }
 
@@ -277,11 +560,144 @@ void init_player(){
     y[M-1] = 118;
 }
 
+void write_string(int a, int b, char c) {
+  // VGA character buffer
+  volatile char * string_output_buffer = (char *) (0xc9000000 + (b<<7) + a);
+  *string_output_buffer = c;
+
+}
+
+void write_opening_display() {
+	
+   	char* game_name = "Worlds Hardest Game!";
+   	int starting_x_position = 155;
+   	while (*game_name) {
+     		write_string(starting_x_position, 14, *game_name);
+	 	starting_x_position++;
+	 	game_name++;
+   	}
+
+	char* names = "Made by: Shrenik and Mohammad";
+   	starting_x_position = 155;
+   	while (*names) {
+     		write_string(starting_x_position, 18, *names);
+	 	starting_x_position++;
+	 	names++;
+   	}
+
+	char* game_rules1 = "Key 0, GO DOWN";
+   	starting_x_position = 155;
+   	while (*game_rules1) {
+     		write_string(starting_x_position, 22, *game_rules1);
+	 	starting_x_position++;
+	 	game_rules1++;
+   	}
+
+	char* game_rules2 = "Key 1, GO RIGHT";
+   	starting_x_position = 155;
+   	while (*game_rules2) {
+     		write_string(starting_x_position, 26, *game_rules2);
+	 	starting_x_position++;
+	 	game_rules2++;
+   	}
+
+	char* game_rules3 = "Key 2, GO LEFT";
+   	starting_x_position = 155;
+   	while (*game_rules3) {
+     		write_string(starting_x_position, 30, *game_rules3);
+	 	starting_x_position++;
+	 	game_rules3++;
+   	}
+
+	char* game_rules4 = "Key 3, GO UP";
+   	starting_x_position = 155;
+   	while (*game_rules4) {
+     		write_string(starting_x_position, 34, *game_rules4);
+	 	starting_x_position++;
+	 	game_rules4++;
+   	}
+}
+
+void write_clear_display() {
+	
+   	char* game_name = "                         ";
+   	int starting_x_position = 155;
+   	while (*game_name) {
+     		write_string(starting_x_position, 14, *game_name);
+	 	starting_x_position++;
+	 	game_name++;
+   	}
+
+	char* names = "                                 ";
+   	starting_x_position = 155;
+   	while (*names) {
+     		write_string(starting_x_position, 18, *names);
+	 	starting_x_position++;
+	 	names++;
+   	}
+
+	char* game_rules1 = "                              ";
+   	starting_x_position = 155;
+   	while (*game_rules1) {
+     		write_string(starting_x_position, 22, *game_rules1);
+	 	starting_x_position++;
+	 	game_rules1++;
+   	}
+
+	char* game_rules2 = "                                 ";
+   	starting_x_position = 155;
+   	while (*game_rules2) {
+     		write_string(starting_x_position, 26, *game_rules2);
+	 	starting_x_position++;
+	 	game_rules2++;
+   	}
+
+	char* game_rules3 = "                                  ";
+   	starting_x_position = 155;
+   	while (*game_rules3) {
+     		write_string(starting_x_position, 30, *game_rules3);
+	 	starting_x_position++;
+	 	game_rules3++;
+   	}
+
+	char* game_rules4 = "                                    ";
+   	starting_x_position = 155;
+   	while (*game_rules4) {
+     		write_string(starting_x_position, 34, *game_rules4);
+	 	starting_x_position++;
+	 	game_rules4++;
+   	}
+
+		
+}
+
+void write_next_level_display() {
+	
+   	char* game_name = "Nice!! Lets go faster!";
+   	int starting_x_position = 155;
+   	while (*game_name) {
+     		write_string(starting_x_position, 14, *game_name);
+	 	starting_x_position++;
+	 	game_name++;
+   	}	
+}
+
+void write_finished_display() {
+	
+   	char* game_name = "Congrats! You Win!";
+   	int starting_x_position = 155;
+   	while (*game_name) {
+     		write_string(starting_x_position, 14, *game_name);
+	 	starting_x_position++;
+	 	game_name++;
+   	}	
+}
+
 
 /* GAME LOGIC FUNCTIONS */
 
 bool check_in_bounds(){
-    if (x[M-1] < 0 || x[M-1] >= 320 - SIZE || y[M-1] < 0 || y[M-1] >= 240-SIZE){
+    if (x[M-1] < 0 || x[M-1] >= (320 - SIZE) || y[M-1] < 0 || y[M-1] >= (240-SIZE)){
         return false;
     }
     return true;
@@ -325,6 +741,11 @@ bool check_win(int coin_count){
     }
     return false;
 }
+
+
+
+/* !!!! The below code was referenced and modified from the Intel DE1-SOC manual. Credit to them for providing a base template we would be
+    able to use for our own game.  !!!! */
 
 /*setup the KEY interrupts in the FPGA*/
 void config_KEYs() {
