@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define M 10
-#define NUM_COINS 3
+#define M 15
+#define NUM_COINS 10
 #define SIZE 6
 #define PLAYER_COLOUR 0xF800 // red
 #define OBSTACLE_COLOUR 0x001F // blue
@@ -124,7 +124,7 @@ int main(){
     int coin_count = 0;
 
 
-  /*  while (!check_win(coin_count)){
+    while (!check_win(coin_count)){
         // coins
         plot_coins();
 
@@ -167,7 +167,7 @@ int main(){
         wait(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
         
-    } */
+    } 
 
     // Level 2
     // Set the initial positions of the obstacles
@@ -225,12 +225,10 @@ int main(){
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
     clear_screen();
 
-    count = 0;
-
     coin_count = 0;
 
 
-  /*  while (!check_win(coin_count)){
+    while (!check_win(coin_count)){
         // coins
         plot_coins();
 
@@ -273,7 +271,7 @@ int main(){
         wait(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
         
-    } */
+    } 
 
 
     // Level 3
@@ -329,8 +327,6 @@ int main(){
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
     clear_screen();
-
-    count = 0;
 
     coin_count = 0;
 
