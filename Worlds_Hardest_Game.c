@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define M 15
-#define NUM_COINS 10
+#define M 20
+#define NUM_COINS 15
 #define SIZE 6
 #define PLAYER_COLOUR 0xF800 // red
 #define OBSTACLE_COLOUR 0x001F // blue
@@ -31,6 +31,7 @@ void write_next_level_display();
 void write_clear_display();
 void write_finished_display();
 void colour_screen(short int colour);
+void clear_player_hit();
 
 
 void disable_A9_interrupts(void);
@@ -46,6 +47,8 @@ volatile int pixel_backBuffer_start;
 int x[M], y[M], incx[M], incy[M];
 int coin_x[NUM_COINS], coin_y[NUM_COINS];
 bool coin_exists[NUM_COINS];
+
+bool playing =false;
 
 int old_pos[2];
 
@@ -87,7 +90,7 @@ int main(){
         coin_exists[i] = true;
         // coin_x[i] = 25+ i * 67;
         // coin_y[i] = 10 + i*55;
-        coin_x[i] = rand() % 300 + 20;
+        coin_x[i] = rand() % 280 + 20;
         coin_y[i] = rand() % 210 + 5;
 
     }
@@ -100,7 +103,7 @@ int main(){
     pixel_buffer_start = *pixel_ctrl_ptr;
 
     // Introduction
-    colour_screen(0x0000);
+     colour_screen(0x0000);
     int prev = *sw_ptr;
      while (*sw_ptr == prev){
          write_opening_display();
@@ -114,6 +117,7 @@ int main(){
     /* set back pixel buffer to start of SDRAM memory */
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
+    write_clear_display();
     clear_screen();
 
     // Code to write SW to HEX display
@@ -123,8 +127,10 @@ int main(){
 
     int coin_count = 0;
 
-
+    playing = true;
     while (!check_win(coin_count)){
+
+         
         // coins
         plot_coins();
 
@@ -132,19 +138,21 @@ int main(){
         clear_player();
         plot_player();
 
-
-        // obstacles
-        clear_obstacles();
-        plot_obstacles(1);
-        
         if (player_hit()){
             count++;
-            init_player();
+            init_player();            
             coin_count = 0;
             for (int i = 0; i < NUM_COINS; i++){
                 coin_exists[i] = true;
             }
         }
+
+
+        // obstacles
+        clear_obstacles();
+        plot_obstacles(1);
+        
+
         // check if player collides into a coin
         int coin = collected_coin();
         if(coin != -1){
@@ -164,10 +172,12 @@ int main(){
             *HEX3_0_ptr = (seg7[0] << 8) | seg7[count];
         }
 
+        
         wait(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
         
-    } 
+    }  
+    playing = false;
 
     // Level 2
     // Set the initial positions of the obstacles
@@ -223,11 +233,13 @@ int main(){
     /* set back pixel buffer to start of SDRAM memory */
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
+
+    write_clear_display();
     clear_screen();
 
     coin_count = 0;
 
-
+    playing = true;
     while (!check_win(coin_count)){
         // coins
         plot_coins();
@@ -244,6 +256,13 @@ int main(){
         if (player_hit()){
             count++;
             init_player();
+            clear_player();
+            wait(); // swap front and back buffers on VGA vertical sync
+            pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
+            clear_player();
+            wait(); // swap front and back buffers on VGA vertical sync
+            pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
+
             coin_count = 0;
             for (int i = 0; i < NUM_COINS; i++){
                 coin_exists[i] = true;
@@ -271,18 +290,19 @@ int main(){
         wait(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
         
-    } 
+    }  
+    playing = false;
 
 
     // Level 3
      for (int i = 0; i < M-1; ++i){
         if (i%2 == 0){
             y[i] = 1;
-            incy[i] = 3;
+            incy[i] = 4;
         }
         else {
             y[i] = 235;
-            incy[i] = -3;
+            incy[i] = -4;
         }
         incx[i] = 0;
         x[i] = PLATFORM_SIZE + ((320-PLATFORM_SIZE)/(M-1))*i;
@@ -326,11 +346,13 @@ int main(){
     /* set back pixel buffer to start of SDRAM memory */
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
+
+    write_clear_display();
     clear_screen();
 
     coin_count = 0;
 
-
+    playing = true;
     while (!check_win(coin_count)){
         // coins
         plot_coins();
@@ -347,6 +369,7 @@ int main(){
         if (player_hit()){
             count++;
             init_player();
+            clear_player();
             coin_count = 0;
             for (int i = 0; i < NUM_COINS; i++){
                 coin_exists[i] = true;
@@ -375,6 +398,7 @@ int main(){
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
         
     }
+    playing = false;
 
     *(pixel_ctrl_ptr + 1) = 0xC8000000; // first store the address in the back buffer
     /* now, swap the front/back buffers, to set the front buffer location */
@@ -498,6 +522,24 @@ void clear_player(){
             }
             else{
                 plot_pixel(old_pos[0]+i, old_pos[1]+j, 0xFFFF);   
+            }
+        }
+    }
+}
+
+void clear_player_hit(){
+    for (int i = 0; i < SIZE; ++i){
+        for (int j = 0; j < SIZE; ++j){
+            if ((x[M-1] + i >= 0 && old_pos[0] + i < PLATFORM_SIZE) || (x[M-1] + i >= 320 - PLATFORM_SIZE && x[M-1] + i < 320)){
+                if (y[M-1] + j >= (240/2)-PLATFORM_SIZE/2 && y[M-1] + j < (240/2)+PLATFORM_SIZE/2){
+                    plot_pixel(old_pos[0]+i, y[M-1]+j, 0x07E0); 
+                }
+                else{
+                    plot_pixel(x[M-1]+i, y[M-1]+j, 0xFFFF);   
+                }
+            }
+            else{
+                plot_pixel(x[M-1]+i, y[M-1]+j, 0xFFFF);   
             }
         }
     }
@@ -693,7 +735,7 @@ void write_finished_display() {
 /* GAME LOGIC FUNCTIONS */
 
 bool check_in_bounds(){
-    if (x[M-1] < 0 || x[M-1] >= (320 - SIZE) || y[M-1] < 0 || y[M-1] >= (240-SIZE)){
+    if (x[M-1] < 0 || x[M-1] >= 314 || y[M-1] < 0 || y[M-1] >= 234){
         return false;
     }
     return true;
@@ -846,36 +888,40 @@ void pushbutton_ISR(void) {
     int press;
     press          =*(KEY_ptr + 3);// read the pushbutton interrupt register
     *(KEY_ptr + 3) = press;// Clear the interrupt
+    if (playing){
+        old_pos[0] = x[M-1];
+        old_pos[1] = y[M-1];
+    
+        clear_player();
+    
 
-    old_pos[0] = x[M-1];
-    old_pos[1] = y[M-1];
+        if(press & 0x1){ // KEY0
+            y[M-1] = y[M-1] + (SIZE+1); 
+            if(!check_in_bounds()){
+                y[M-1] = y[M-1] - (SIZE+1); 
+            }
 
-    if(press & 0x1){ // KEY0
-        y[M-1] = y[M-1] + SIZE+1; 
-        if(!check_in_bounds()){
-            y[M-1] = y[M-1] - SIZE+1; 
         }
-
-    }
-    else if(press & 0x2){// KEY1
-        x[M-1] = x[M-1] + SIZE+1;
-        if(!check_in_bounds()){
-            x[M-1] = x[M-1] - SIZE+1;
-        }
-    }
-    else if(press & 0x4){ // KEY2
-        x[M-1] = x[M-1] - (SIZE+1);
-        if(!check_in_bounds()){
+        else if(press & 0x2){// KEY1
             x[M-1] = x[M-1] + (SIZE+1);
+            if(!check_in_bounds()){
+                x[M-1] = x[M-1] - (SIZE+1);
+            }
         }
-    }
-    else{   // press & 0x8, which is KEY3
-        y[M-1] = y[M-1] - (SIZE+1);
-        if(!check_in_bounds()){
-            y[M-1] = y[M-1] + (SIZE+1);
+        else if(press & 0x4){ // KEY2
+            x[M-1] = x[M-1] - (SIZE+1);
+            if(!check_in_bounds()){
+                x[M-1] = x[M-1] + (SIZE+1);
+            }
         }
+        else{   // press & 0x8, which is KEY3
+            y[M-1] = y[M-1] - (SIZE+1);
+            if(!check_in_bounds()){
+                y[M-1] = y[M-1] + (SIZE+1);
+            }
+        }
+        plot_player();
     }
-        
 
     return;
 }
