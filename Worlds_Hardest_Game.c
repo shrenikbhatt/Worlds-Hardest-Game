@@ -77,7 +77,7 @@ int main(){
             incy[i] = -1;
         }
         incx[i] = 0;
-        x[i] = PLATFORM_SIZE + ((320-PLATFORM_SIZE)/(M-1))*i;
+        x[i] = PLATFORM_SIZE + ((316-PLATFORM_SIZE)/(M-1))*i;
     }
 
     // Set position for player
@@ -920,7 +920,7 @@ void pushbutton_ISR(void) {
                 y[M-1] = y[M-1] + (SIZE+1);
             }
         }
-        plot_player();
+         plot_player();
     }
 
     return;
